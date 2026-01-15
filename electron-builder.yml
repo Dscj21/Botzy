@@ -41,6 +41,6 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  owner: REPLACE_WITH_GITHUB_USERNAME
-  repo: botzy
+  owner: Dscj21
+  repo: Botzy
   private: true

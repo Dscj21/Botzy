@@ -8,7 +8,7 @@
   "homepage": "https://electron-vite.org",
   "repository": {
     "type": "git",
-    "url": "https://github.com/REPLACE_WITH_YOUR_REPO/botzy.git"
+    "url": "https://github.com/Dscj21/Botzy.git"
   },
   "scripts": {
     "format": "prettier --write .",

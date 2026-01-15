@@ -402,7 +402,7 @@ export const setupIpcHandlers = (mainWindow: BrowserWindow) => {
           const db = dbManager.getDb()
           const insertAccount = db.prepare(`INSERT OR REPLACE INTO accounts (id, label, platform, username, encrypted_password, profile_id, proxy_string, is_gst) VALUES (@id, @label, @platform, @username, @encrypted_password, @profile_id, @proxy_string, @is_gst)`)
           const insertProfile = db.prepare(`INSERT OR REPLACE INTO profiles (id, profile_name, address_json, card_encrypted) VALUES (@id, @profile_name, @address_json, @card_encrypted)`)
-          const insertOrder = db.prepare(`INSERT OR REPLACE INTO orders (order_id, platform, product_name, quantity, price, status, order_date, image_url, tracking_id, delivery_otp) VALUES (@order_id, @platform, @product_name, @quantity, @price, @status, @order_date, @image_url, @tracking_id, @delivery_otp)`)
+          const insertOrder = db.prepare(`INSERT OR REPLACE INTO orders (order_id, account_id, platform, product_name, quantity, price, status, order_date, image_url, tracking_id, delivery_otp) VALUES (@order_id, @account_id, @platform, @product_name, @quantity, @price, @status, @order_date, @image_url, @tracking_id, @delivery_otp)`)
           
           const transaction = db.transaction(() => {
                for (const acc of data.accounts) insertAccount.run({ ...acc, is_gst: acc.is_gst || 0 })
