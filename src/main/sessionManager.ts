@@ -81,7 +81,12 @@ export class SessionManager {
             }
         })
         
-        view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
+        // Real Chrome 124 UA
+        view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.61 Safari/537.36')
+        
+        view.webContents.on('did-fail-load', (_e, code, desc) => {
+             console.error('[BrowserView] Load failed:', code, desc)
+        })
         view.setBounds({ x: 0, y: 0, width: 1366, height: 768 })
         
         if (!background) {
