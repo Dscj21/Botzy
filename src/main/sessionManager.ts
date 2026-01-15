@@ -81,7 +81,7 @@ export class SessionManager {
             }
         })
         
-        view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
         view.setBounds({ x: 0, y: 0, width: 1366, height: 768 })
         
         if (!background) {
@@ -163,8 +163,8 @@ export class SessionManager {
     resizeView(view: BrowserView) {
         if (!this.mainWindow) return
         const bounds = this.mainWindow.getBounds()
-        const sidebarWidth = 260 
-        const titleBarHeight = 30
+        const sidebarWidth = 288 
+        const titleBarHeight = 48
         
         view.setBounds({
             x: sidebarWidth,
