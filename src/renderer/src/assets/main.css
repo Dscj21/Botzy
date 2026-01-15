@@ -1,0 +1,38 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-primary: #3b82f6;
+  --color-secondary: #1e40af;
+  --color-accent: #f59e0b;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  @apply bg-gray-900 text-white font-sans;
+  overflow: hidden; /* Prevent body scroll, handle in containers */
+}
+
+/* Custom Scrollbar for Chrome/Edge/Safari */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Hide scrollbar for cleaner look where needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
