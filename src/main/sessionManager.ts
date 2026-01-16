@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow, session } from 'electron'
+import { BrowserView, BrowserWindow, session, Menu } from 'electron'
 import * as path from 'path'
 
 export class SessionManager {
@@ -113,7 +113,28 @@ export class SessionManager {
 
         view.webContents.on('did-finish-load', () => {
              console.log(`[BrowserView] Loaded: ${url}`)
-             win.webContents.send('automation:log', `✅ Page loaded successfully`)
+             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                 this.mainWindow.webContents.send('automation:log', `✅ Page loaded successfully`)
+             }
+        })
+
+        // Enable Right-Click Context Menu (Copy/Paste Fix)
+        view.webContents.on('context-menu', () => {
+            const menu = Menu.buildFromTemplate([
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                { role: 'pasteAndMatchStyle' },
+                { role: 'delete' },
+                { role: 'selectAll' }
+            ])
+            const win = this.getMainWindow()
+            if (win) {
+                 menu.popup({ window: win })
+            }
         })
         
         // Forward console errors from the page itself (Debug White Screen)
