@@ -104,6 +104,12 @@ export class DatabaseManager {
       this.db.exec('ALTER TABLE orders ADD COLUMN delivered_date TEXT')
       console.log('Migrated orders table: added delivered_date')
     } catch { }
+    
+    // Migration for credit_card
+    try {
+      this.db.exec('ALTER TABLE orders ADD COLUMN credit_card TEXT')
+      console.log('Migrated orders table: added credit_card')
+    } catch { }
   }
 
   init() {

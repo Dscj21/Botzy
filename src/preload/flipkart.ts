@@ -118,6 +118,18 @@ function injectUI() {
 function scanOffers() {
     const keywords = userCardName ? userCardName.split(' ').filter(w => w.length > 2) : []
     
+    // Status Logic for Orders Page (Specific Fixes)
+    if (window.location.href.includes('orders') || window.location.href.includes('account/orders')) {
+        // Fix for "Returned" false positive
+        /*
+        const orderRows = document.querySelectorAll('div.AO0lcs, div._2parZw') // Common order row classes
+        orderRows.forEach((row: any) => {
+             // Check if "Your item has left a Flipkart Facility" is present in shipping details
+             // Used for tracking fix
+        })
+        */
+    }
+
     // Simple text scan of likely candidates
     const nodes = document.querySelectorAll('li, div, span')
     const detectedOffers: string[] = []

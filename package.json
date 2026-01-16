@@ -1,7 +1,7 @@
 {
   "name": "botzy",
   "productName": "Botzy",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -21,6 +21,7 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
+    "build:win:fast": "npm run build:unpack",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux"

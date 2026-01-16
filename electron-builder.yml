@@ -1,5 +1,6 @@
 appId: com.botzy.app
 productName: Botzy
+compression: maximum
 directories:
   buildResources: build
 files:

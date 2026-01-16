@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
 import { RefreshCw, Download, Trash2, Search, CheckSquare, Filter } from 'lucide-react'
 
@@ -14,6 +14,94 @@ export function OrdersPage() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<Set<number>>(new Set())
   const [showSyncModal, setShowSyncModal] = useState(false)
 
+  /* Helper Functions */
+  async function loadOrders() {
+    const data = await (window as any).electron.ipcRenderer.invoke('db:get-orders')
+    setOrders(data)
+  }
+
+  async function loadAccounts() {
+    const accs = await (window as any).electron.ipcRenderer.invoke('db:get-accounts')
+    setAccounts(accs)
+    setSelectedAccountIds(new Set(accs.map((a: any) => a.id)))
+  }
+
+  const toggleAccount = (id: number) => {
+    const newSet = new Set(selectedAccountIds)
+    if (newSet.has(id)) newSet.delete(id)
+    else newSet.add(id)
+    setSelectedAccountIds(newSet)
+  }
+
+  const toggleAll = () => {
+    if (selectedAccountIds.size === accounts.length) setSelectedAccountIds(new Set())
+    else setSelectedAccountIds(new Set(accounts.map((a: any) => a.id)))
+  }
+
+  const stopSyncRef = useRef(false)
+
+  const handleStartSync = async () => {
+    if (selectedAccountIds.size === 0) return alert('Please select at least one account')
+    setShowSyncModal(false)
+    setIsSyncing(true)
+    stopSyncRef.current = false
+
+    const targets = accounts.filter((a) => selectedAccountIds.has(a.id))
+
+    for (const acc of targets) {
+      if (stopSyncRef.current) {
+        console.log('[Sync] Stopped by user.')
+        break
+      }
+
+      const name = acc.label || acc.username || `Account ${acc.id}`
+      setCurrentSyncAccount(name)
+
+      const url =
+        acc.platform === 'AMZ'
+          ? 'https://www.amazon.in/gp/css/order-history'
+          : 'https://www.flipkart.com/account/orders'
+
+      console.log(`[Sync] Opening session for ${name} at ${url}`)
+      // BACKGROUND MODE (Headless) as requested
+      await api.openSession(acc.id.toString(), url, true)
+      // Initial wait to allow page load
+      await new Promise((r) => setTimeout(r, 6000))
+    }
+
+    if (stopSyncRef.current) {
+      setIsSyncing(false)
+      setCurrentSyncAccount('')
+      return
+    }
+
+    // Fallback timeout
+    const timeout = targets.length * 180000
+    setTimeout(() => {
+      if (isSyncing) {
+        setIsSyncing(false)
+        setCurrentSyncAccount('')
+        loadOrders()
+      }
+    }, timeout)
+  }
+
+  const handleStopSync = () => {
+    stopSyncRef.current = true
+    setIsSyncing(false)
+    setCurrentSyncAccount('')
+    // Optionally kill all sessions?
+    // (window as any).electron.ipcRenderer.invoke('session:hide-all')
+  }
+
+  const handleClearHistory = async () => {
+    if (!confirm('Are you sure you want to delete ALL order history? This cannot be undone.'))
+      return
+    await (window as any).electron.ipcRenderer.invoke('db:clear-orders')
+    setOrders([])
+  }
+
+  /* Effects */
   useEffect(() => {
     loadOrders()
     loadAccounts()
@@ -41,68 +129,6 @@ export function OrdersPage() {
     }
   }, [])
 
-  async function loadOrders() {
-    const data = await (window as any).electron.ipcRenderer.invoke('db:get-orders')
-    setOrders(data)
-  }
-
-  async function loadAccounts() {
-    const accs = await (window as any).electron.ipcRenderer.invoke('db:get-accounts')
-    setAccounts(accs)
-    setSelectedAccountIds(new Set(accs.map((a: any) => a.id)))
-  }
-
-  const toggleAccount = (id: number) => {
-    const newSet = new Set(selectedAccountIds)
-    if (newSet.has(id)) newSet.delete(id)
-    else newSet.add(id)
-    setSelectedAccountIds(newSet)
-  }
-
-  const toggleAll = () => {
-    if (selectedAccountIds.size === accounts.length) setSelectedAccountIds(new Set())
-    else setSelectedAccountIds(new Set(accounts.map((a: any) => a.id)))
-  }
-
-  const handleStartSync = async () => {
-    if (selectedAccountIds.size === 0) return alert('Please select at least one account')
-    setShowSyncModal(false)
-    setIsSyncing(true)
-
-    const targets = accounts.filter(a => selectedAccountIds.has(a.id))
-
-    for (const acc of targets) {
-      const name = acc.label || acc.username || `Account ${acc.id}`
-      setCurrentSyncAccount(name)
-
-      const url = acc.platform === 'AMZ'
-        ? 'https://www.amazon.in/gp/css/order-history'
-        : 'https://www.flipkart.com/account/orders'
-
-      console.log(`[Sync] Opening session for ${name} at ${url}`)
-      // BACKGROUND MODE (Headless) as requested
-      await api.openSession(acc.id.toString(), url, true)
-      // Initial wait to allow page load
-      await new Promise(r => setTimeout(r, 6000))
-    }
-
-    // Fallback timeout
-    const timeout = targets.length * 180000
-    setTimeout(() => {
-      if (isSyncing) {
-        setIsSyncing(false)
-        setCurrentSyncAccount('')
-        loadOrders()
-      }
-    }, timeout)
-  }
-
-  const handleClearHistory = async () => {
-    if (!confirm('Are you sure you want to delete ALL order history? This cannot be undone.')) return
-    await (window as any).electron.ipcRenderer.invoke('db:clear-orders')
-    setOrders([])
-  }
-
   const formatDateDisplay = (iso: string) => {
     if (!iso) return '-'
     try {
@@ -113,25 +139,93 @@ export function OrdersPage() {
       const mm = String(d.getMonth() + 1).padStart(2, '0')
       const yyyy = d.getFullYear()
       return `${dd}/${mm}/${yyyy}`
-    } catch (e) { return iso }
+    } catch (e) {
+      return iso
+    }
   }
 
-  const filteredOrders = orders.filter(o => {
-    const matchSearch = (o.order_id?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (o.product_name?.toLowerCase() || '').includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'All' || o.status === statusFilter
-    return matchSearch && matchStatus
-  })
+  /* Inline Edit Component */
+  const InlineEdit = ({
+    orderId,
+    field,
+    value,
+    onUpdate
+  }: {
+    orderId: string
+    field: string
+    value: string
+    onUpdate: () => void
+  }) => {
+    const [editing, setEditing] = useState(false)
+    const [tempValue, setTempValue] = useState(value || '')
+
+    const handleSave = async () => {
+      if (tempValue !== value) {
+        await (window as any).electron.ipcRenderer.invoke('db:update-order-field', {
+          order_id: orderId,
+          field,
+          value: tempValue
+        })
+        onUpdate()
+      }
+      setEditing(false)
+    }
+
+    if (editing) {
+      return (
+        <input
+          autoFocus
+          className="w-full bg-slate-700 text-white px-2 py-1 rounded outline-none border border-blue-500 text-xs"
+          value={tempValue}
+          onChange={(e) => setTempValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+        />
+      )
+    }
+
+    return (
+      <div
+        onClick={() => setEditing(true)}
+        className={`cursor-pointer min-h-[20px] px-2 py-1 rounded hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-600 flex items-center gap-2 ${!value ? 'text-gray-600 italic' : 'text-emerald-400 font-mono'}`}
+      >
+        {value || 'Add Card'}
+      </div>
+    )
+  }
+
+  const filteredOrders = orders
+    .filter((o) => {
+      const matchSearch =
+        (o.order_id?.toLowerCase() || '').includes(search.toLowerCase()) ||
+        (o.product_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+        (o.account_id?.toString() || '').includes(search.toLowerCase())
+      const matchStatus = statusFilter === 'All' || o.status === statusFilter
+      return matchSearch && matchStatus
+    })
     // Sort Descending by Date (String ISO comparison works for YYYY-MM-DD)
     .sort((a, b) => (b.order_date || '').localeCompare(a.order_date || ''))
 
   return (
     <div className="p-8 text-gray-100 h-full overflow-y-auto relative">
       {isSyncing && (
-        <div className="sticky top-0 left-0 right-0 -mt-4 mb-4 bg-indigo-600 text-white py-3 px-4 text-center font-bold shadow-lg rounded-lg animate-pulse z-50 flex items-center justify-center gap-2 border border-indigo-400">
-          <span className="animate-spin">🔄</span>
-          <span>Syncing: <span className="text-yellow-300">{currentSyncAccount}</span></span>
-          <span className="text-xs bg-black/20 px-2 py-1 rounded ml-2">Headless Mode</span>
+        <div className="fixed top-4 right-4 z-50 bg-indigo-900/90 border border-indigo-500 text-white px-4 py-2 rounded shadow-lg flex items-center gap-3 backdrop-blur-sm animate-pulse">
+          <RefreshCw className="w-5 h-5 animate-spin" />
+          <div>
+            <div className="font-bold text-sm">Syncing Orders...</div>
+            <div className="text-xs text-indigo-200">
+              Syncing: <span className="text-yellow-300">{currentSyncAccount}</span>
+            </div>
+          </div>
+          <button
+            onClick={handleStopSync}
+            className="ml-2 bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-1 rounded"
+          >
+            STOP
+          </button>
         </div>
       )}
 
@@ -148,12 +242,23 @@ export function OrdersPage() {
           <button
             onClick={() => setShowSyncModal(true)}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all shadow-lg ${isSyncing ? 'bg-gray-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-              }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all shadow-lg ${
+              isSyncing ? 'bg-gray-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+            }`}
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Start Sync (New)'}
           </button>
+
+          {isSyncing && (
+            <button
+              onClick={handleStopSync}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg"
+            >
+              <Trash2 className="w-4 h-4" /> {/* Reusing trash icon for stop for now, or X */}
+              <span>Stop</span>
+            </button>
+          )}
 
           <button
             onClick={async () => await (window as any).electron.ipcRenderer.invoke('db:export-csv')}
@@ -165,7 +270,8 @@ export function OrdersPage() {
 
           <button
             onClick={handleClearHistory}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg">
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg"
+          >
             <Trash2 className="w-4 h-4" />
             <span>Clear History</span>
           </button>
@@ -184,19 +290,27 @@ export function OrdersPage() {
             </div>
 
             <div className="max-h-[300px] overflow-y-auto space-y-2 mb-6 border border-gray-700 rounded p-2 bg-[#0f172a]">
-              {accounts.length === 0 && <div className="text-gray-500 text-center py-4">No accounts found</div>}
-              {accounts.map(acc => (
+              {accounts.length === 0 && (
+                <div className="text-gray-500 text-center py-4">No accounts found</div>
+              )}
+              {accounts.map((acc) => (
                 <div
                   key={acc.id}
                   onClick={() => toggleAccount(acc.id)}
                   className="flex items-center gap-3 p-3 hover:bg-gray-800 rounded cursor-pointer border border-transparent hover:border-gray-600 transition-all select-none"
                 >
-                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${selectedAccountIds.has(acc.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-500'}`}>
-                    {selectedAccountIds.has(acc.id) && <CheckSquare className="w-3 h-3 text-white" />}
+                  <div
+                    className={`w-5 h-5 rounded flex items-center justify-center border ${selectedAccountIds.has(acc.id) ? 'bg-indigo-600 border-indigo-600' : 'border-gray-500'}`}
+                  >
+                    {selectedAccountIds.has(acc.id) && (
+                      <CheckSquare className="w-3 h-3 text-white" />
+                    )}
                   </div>
                   <div>
                     <div className="font-bold text-gray-200">{acc.label || acc.username}</div>
-                    <div className="text-xs text-gray-500">{acc.platform} • {acc.username}</div>
+                    <div className="text-xs text-gray-500">
+                      {acc.platform} • {acc.username}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -225,9 +339,9 @@ export function OrdersPage() {
           <Search className="w-5 h-5 text-gray-500" />
           <input
             className="bg-transparent text-white outline-none flex-1 placeholder-gray-500"
-            placeholder="Search Order ID or Product..."
+            placeholder="Search Order ID, Product Name, or Account ID..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <div className="relative">
@@ -235,7 +349,7 @@ export function OrdersPage() {
           <select
             className="bg-[#1e293b] border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white outline-none focus:border-blue-500 appearance-none min-w-[150px] cursor-pointer"
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="All">All Status</option>
             <option value="Ordered">Ordered</option>
@@ -253,8 +367,10 @@ export function OrdersPage() {
           <thead className="bg-[#0f172a] text-gray-400 text-xs font-bold uppercase tracking-wider">
             <tr>
               <th className="px-6 py-4 text-left">Date</th>
+              <th className="px-6 py-4 text-left">Account</th>
               <th className="px-6 py-4 text-left">Product</th>
               <th className="px-6 py-4 text-left">Order ID</th>
+              <th className="px-6 py-4 text-left">Credit Card</th>
               <th className="px-6 py-4 text-left">Tracking ID</th>
               <th className="px-6 py-4 text-left">Price</th>
               <th className="px-6 py-4 text-left">Status</th>
@@ -264,27 +380,60 @@ export function OrdersPage() {
           </thead>
           <tbody className="divide-y divide-gray-700">
             {filteredOrders.length === 0 && (
-              <tr><td colSpan={8} className="p-8 text-center text-gray-500">No orders found</td></tr>
+              <tr>
+                <td colSpan={10} className="p-8 text-center text-gray-500">
+                  No orders found
+                </td>
+              </tr>
             )}
             {filteredOrders.map((order, i) => (
               <tr key={i} className="hover:bg-gray-800/50 transition-colors group">
                 <td className="px-6 py-4 text-sm text-gray-400 whitespace-nowrap">
                   {formatDateDisplay(order.order_date)}
                 </td>
+                <td className="px-6 py-4 text-sm text-white">
+                  {(() => {
+                    const acc = accounts.find((a: any) => a.id === order.account_id)
+                    return acc ? (
+                      <div>
+                        <div className="font-bold">{acc.label || acc.username}</div>
+                        <div className="text-[10px] text-gray-500 font-mono">ID: {acc.id}</div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-600 italic">Unknown ({order.account_id})</span>
+                    )
+                  })()}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {order.image_url ? (
-                      <img src={order.image_url} className="w-10 h-10 rounded object-cover border border-gray-600 bg-white" />
+                      <img
+                        src={order.image_url}
+                        className="w-10 h-10 rounded object-cover border border-gray-600 bg-white"
+                      />
                     ) : (
-                      <div className="w-10 h-10 rounded bg-gray-700 flex items-center justify-center text-xl">📦</div>
+                      <div className="w-10 h-10 rounded bg-gray-700 flex items-center justify-center text-xl">
+                        📦
+                      </div>
                     )}
-                    <span className="font-medium text-white line-clamp-2 max-w-[250px] text-sm" title={order.product_name}>
+                    <span
+                      className="font-medium text-white line-clamp-2 max-w-[250px] text-sm"
+                      title={order.product_name}
+                    >
                       {order.product_name}
                     </span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-indigo-400 font-mono select-all font-bold">
                   {order.order_id}
+                </td>
+                <td className="px-6 py-4 text-sm">
+                  <InlineEdit
+                    orderId={order.order_id}
+                    field="credit_card"
+                    value={order.credit_card}
+                    onUpdate={loadOrders}
+                  />
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-300 font-mono select-all">
                   {order.tracking_id || '-'}
@@ -293,21 +442,26 @@ export function OrdersPage() {
                   {order.price ? `₹${order.price}` : '-'}
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-bold border capitalize ${order.status === 'Delivered' ? 'bg-green-900/50 text-green-400 border-green-800' :
-                    order.status === 'Cancelled' ? 'bg-red-900/50 text-red-400 border-red-800' :
-                      order.status === 'Returned' ? 'bg-yellow-900/50 text-yellow-400 border-yellow-800' :
-                        order.status === 'Failed' ? 'bg-red-900/50 text-red-400 border-red-800' :
-                          'bg-blue-900/50 text-blue-400 border-blue-800'
-                    }`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-bold border capitalize ${
+                      order.status === 'Delivered'
+                        ? 'bg-green-900/50 text-green-400 border-green-800'
+                        : order.status === 'Cancelled'
+                          ? 'bg-red-900/50 text-red-400 border-red-800'
+                          : order.status === 'Returned'
+                            ? 'bg-yellow-900/50 text-yellow-400 border-yellow-800'
+                            : order.status === 'Failed'
+                              ? 'bg-red-900/50 text-red-400 border-red-800'
+                              : 'bg-blue-900/50 text-blue-400 border-blue-800'
+                    }`}
+                  >
                     {order.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                   {formatDateDisplay(order.delivered_date)}
                 </td>
-                <td className="px-6 py-4 text-xs text-gray-600">
-                  {order.platform}
-                </td>
+                <td className="px-6 py-4 text-xs text-gray-600">{order.platform}</td>
               </tr>
             ))}
           </tbody>
