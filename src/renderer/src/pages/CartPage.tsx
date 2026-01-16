@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Trash2, ShoppingCart, Zap, CreditCard } from 'lucide-react'
 
 export function CartPage({ logs, setLogs }: { logs: string[], setLogs: React.Dispatch<React.SetStateAction<string[]>> }) {
-    const [targetUrl, setTargetUrl] = useState(() => localStorage.getItem('targetUrl') || 'https://www.flipkart.com/vivo-t4-lite-5g-charger-type-c-original-flash-charging-cable-1-m/p/itm534062145b08e')
+    const [targetUrl, setTargetUrl] = useState(() => localStorage.getItem('targetUrl') || '')
     const [accounts, setAccounts] = useState<any[]>([])
     const [selectedAccounts, setSelectedAccounts] = useState<number[]>([])
 
-    useEffect(() => {
+    const handleSaveUrl = () => {
         localStorage.setItem('targetUrl', targetUrl)
-    }, [targetUrl])
+        setLogs(prev => [`[${new Date().toLocaleTimeString()}] URL Saved!`, ...prev])
+    }
 
     useEffect(() => {
         loadAccounts()
@@ -93,9 +94,10 @@ export function CartPage({ logs, setLogs }: { logs: string[], setLogs: React.Dis
 
     const viewSession = async (accId: number) => {
         const acc = accounts.find(a => a.id === accId)
-        let baseUrl = 'https://www.flipkart.com'
-        if (acc?.platform === 'AMZ') baseUrl = 'https://www.amazon.in'
-        if (acc?.platform === 'SHP') baseUrl = 'https://www.shopsy.in'
+        // Direct to cart for better debugging
+        let baseUrl = 'https://www.flipkart.com/viewcart?marketplace=FLIPKART'
+        if (acc?.platform === 'AMZ') baseUrl = 'https://www.amazon.in/gp/cart/view.html'
+        if (acc?.platform === 'SHP') baseUrl = 'https://www.shopsy.in/viewcart'
 
         await (window as any).electron.ipcRenderer.invoke('session:open', {
             accountId: accId,
@@ -118,12 +120,20 @@ export function CartPage({ logs, setLogs }: { logs: string[], setLogs: React.Dis
                     <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">
                         Target Product URL
                     </label>
-                    <input
-                        className="w-full bg-[#0f172a] border border-gray-600 rounded px-3 py-2 text-sm text-blue-100 focus:border-blue-500 outline-none"
-                        value={targetUrl}
-                        onChange={e => setTargetUrl(e.target.value)}
-                        placeholder="https://flipkart.com/..."
-                    />
+                    <div className="flex gap-2">
+                        <input
+                            className="w-full bg-[#0f172a] border border-gray-600 rounded px-3 py-2 text-sm text-blue-100 focus:border-blue-500 outline-none"
+                            value={targetUrl}
+                            onChange={e => setTargetUrl(e.target.value)}
+                            placeholder="https://flipkart.com/..."
+                        />
+                        <button
+                            onClick={handleSaveUrl}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded font-bold text-sm transition-colors"
+                        >
+                            Save
+                        </button>
+                    </div>
                 </div>
 
                 <div className="bg-[#1e293b] rounded-lg p-6 border border-gray-700 shadow-lg">

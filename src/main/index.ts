@@ -5,6 +5,9 @@ import icon from '../../resources/icon.png?asset'
 import { dbManager } from './database'
 import { setupIpcHandlers } from './ipcHandlers'
 
+// Fix for white screen / rendering issues
+app.disableHardwareAcceleration()
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {

@@ -1,5 +1,15 @@
 const { ipcRenderer } = require('electron')
 
+// CRITICAL FIX: Prevent generic white screen on React/Webpack apps (Flipkart)
+// by removing Electron symbols that confuse the bundler.
+if (window) {
+    try {
+        delete (window as any).exports
+        delete (window as any).module
+        delete (window as any).process // CRITICAL: Stop React from assuming NodeEnv and using require()
+    } catch(e) {}
+}
+
 function dispatchInputEvent(element: any) { // Use any to avoid lint errors if HTMLElement not ready
     if (!element) return
     try {

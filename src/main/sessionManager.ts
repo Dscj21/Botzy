@@ -73,13 +73,15 @@ export class SessionManager {
             webPreferences: {
                 partition: `persist:${id}`,
                 preload: preloadPath,
-                nodeIntegration: true,
-                contextIsolation: false,
+                nodeIntegration: false,
+                contextIsolation: true, // Fix Webpack conflicts
                 sandbox: false,
                 backgroundThrottling: false,
                 webSecurity: false 
             }
         })
+        
+        view.setBackgroundColor('#1e1e1e') // Visual debugging
         
         // Real Chrome 124 UA
         view.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.61 Safari/537.36')
@@ -98,13 +100,74 @@ export class SessionManager {
             // Detached view for headless
         }
 
+        // Detailed Event Logging
+        view.webContents.on('did-fail-load', (_e, code, desc, validatedUrl) => {
+             console.error(`[BrowserView] Load Failed: ${code} - ${desc} (${validatedUrl})`)
+             win.webContents.send('automation:log', `❌ Error loading page: ${desc} (${code})`)
+        })
+
+        view.webContents.on('render-process-gone', (_e, details) => {
+             console.error(`[BrowserView] Crashed: ${details.reason}`)
+             win.webContents.send('automation:log', `❌ CRITICAL: Browser view crashed! (${details.reason})`)
+        })
+
+        view.webContents.on('did-finish-load', () => {
+             console.log(`[BrowserView] Loaded: ${url}`)
+             win.webContents.send('automation:log', `✅ Page loaded successfully`)
+        })
+        
+        // Forward console errors from the page itself (Debug White Screen)
+        view.webContents.on('console-message', (_e, level, message, line, sourceId) => {
+             if (level >= 2) { // Error or Warning
+                 console.log(`[Target Console] ${message} (${sourceId}:${line})`)
+                 if (message.includes('Error') || message.includes('Exception')) {
+                     win.webContents.send('automation:log', `[Page Error] ${message}`)
+                 }
+             }
+        })
+
+        // BYPASS CSP: The ultimate fix for "White Screen" on secure pages like Cart
+        // Case-insensitive header removal is required.
+        ses.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details, callback) => {
+            const newHeaders = { ...details.responseHeaders }
+            
+            Object.keys(newHeaders).forEach(key => {
+                const lower = key.toLowerCase()
+                if (['content-security-policy', 'x-frame-options', 'x-content-type-options', 'content-security-policy-report-only'].includes(lower)) {
+                    delete newHeaders[key]
+                }
+            })
+
+            callback({ 
+                responseHeaders: newHeaders,
+                cancel: false
+            })
+        })
+
+        // SPOOF HEADERS: Ensure API calls (fetch/xhr) usually Referer/Origin to valid checks
+        ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
+            const requestHeaders = { ...details.requestHeaders }
+            
+            // Fool Flipkart into thinking we are a real browser on their site
+            requestHeaders['Referer'] = 'https://www.flipkart.com/'
+            requestHeaders['Origin'] = 'https://www.flipkart.com'
+            // Ensure we look like a navigation or xmlhttprequest
+            if (!requestHeaders['User-Agent']) {
+                 requestHeaders['User-Agent'] = view.webContents.getUserAgent()
+            }
+
+            callback({ requestHeaders })
+        })
+
         try {
             await Promise.race([
-                view.webContents.loadURL(url),
+                // Sending Referer is crucial for deep links like Cart
+                view.webContents.loadURL(url, { httpReferrer: 'https://www.flipkart.com/' }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Load Timeout')), 25000))
             ])
-        } catch(e) {
+        } catch(e: any) {
             console.error('Failed to load URL', e)
+            win.webContents.send('automation:log', `❌ Load Timeout/Error: ${e.message}`)
         }
 
         this.broadcastSessions()
