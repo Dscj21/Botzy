@@ -159,7 +159,15 @@ export function OrdersPage() {
     const [editing, setEditing] = useState(false)
     const [tempValue, setTempValue] = useState(value || '')
 
+    useEffect(() => {
+      setTempValue(value || '')
+    }, [value])
+
     const handleSave = async () => {
+      // Don't save if unchanged
+      //   if (tempValue !== value) { // Logic moved to blur/enter
+      //   }
+      // Actually, we must save on blur or enter
       if (tempValue !== value) {
         await (window as any).electron.ipcRenderer.invoke('db:update-order-field', {
           order_id: orderId,
@@ -175,13 +183,16 @@ export function OrdersPage() {
       return (
         <input
           autoFocus
-          className="w-full bg-slate-700 text-white px-2 py-1 rounded outline-none border border-blue-500 text-xs"
+          className="w-[150px] bg-slate-700 text-white px-2 py-1 rounded outline-none border border-blue-500 text-sm font-mono"
           value={tempValue}
           onChange={(e) => setTempValue(e.target.value)}
           onBlur={handleSave}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSave()
-            if (e.key === 'Escape') setEditing(false)
+            if (e.key === 'Escape') {
+              setTempValue(value || '')
+              setEditing(false)
+            }
           }}
         />
       )
@@ -190,7 +201,7 @@ export function OrdersPage() {
     return (
       <div
         onClick={() => setEditing(true)}
-        className={`cursor-pointer min-h-[20px] px-2 py-1 rounded hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-600 flex items-center gap-2 ${!value ? 'text-gray-600 italic' : 'text-emerald-400 font-mono'}`}
+        className={`cursor-pointer min-h-[30px] min-w-[100px] px-2 py-1 rounded hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-600 flex items-center gap-2 ${!value ? 'text-gray-600 italic text-xs' : 'text-emerald-400 font-mono text-sm'}`}
       >
         {value || 'Add Card'}
       </div>
@@ -202,7 +213,8 @@ export function OrdersPage() {
       const matchSearch =
         (o.order_id?.toLowerCase() || '').includes(search.toLowerCase()) ||
         (o.product_name?.toLowerCase() || '').includes(search.toLowerCase()) ||
-        (o.account_id?.toString() || '').includes(search.toLowerCase())
+        (o.account_id?.toString() || '').includes(search.toLowerCase()) ||
+        (o.tracking_id?.toLowerCase() || '').includes(search.toLowerCase())
       const matchStatus = statusFilter === 'All' || o.status === statusFilter
       return matchSearch && matchStatus
     })
@@ -242,9 +254,8 @@ export function OrdersPage() {
           <button
             onClick={() => setShowSyncModal(true)}
             disabled={isSyncing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all shadow-lg ${
-              isSyncing ? 'bg-gray-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-all shadow-lg ${isSyncing ? 'bg-gray-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+              }`}
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Syncing...' : 'Start Sync (New)'}
@@ -397,7 +408,7 @@ export function OrdersPage() {
                     return acc ? (
                       <div>
                         <div className="font-bold">{acc.label || acc.username}</div>
-                        <div className="text-[10px] text-gray-500 font-mono">ID: {acc.id}</div>
+                        <div className="text-[10px] text-gray-500 font-mono">{acc.platform} • {acc.username}</div>
                       </div>
                     ) : (
                       <span className="text-gray-600 italic">Unknown ({order.account_id})</span>
@@ -443,17 +454,16 @@ export function OrdersPage() {
                 </td>
                 <td className="px-6 py-4">
                   <span
-                    className={`px-2 py-1 rounded text-xs font-bold border capitalize ${
-                      order.status === 'Delivered'
-                        ? 'bg-green-900/50 text-green-400 border-green-800'
-                        : order.status === 'Cancelled'
-                          ? 'bg-red-900/50 text-red-400 border-red-800'
-                          : order.status === 'Returned'
-                            ? 'bg-yellow-900/50 text-yellow-400 border-yellow-800'
-                            : order.status === 'Failed'
-                              ? 'bg-red-900/50 text-red-400 border-red-800'
-                              : 'bg-blue-900/50 text-blue-400 border-blue-800'
-                    }`}
+                    className={`px-2 py-1 rounded text-xs font-bold border capitalize ${order.status === 'Delivered'
+                      ? 'bg-green-900/50 text-green-400 border-green-800'
+                      : order.status === 'Cancelled'
+                        ? 'bg-red-900/50 text-red-400 border-red-800'
+                        : order.status === 'Returned'
+                          ? 'bg-yellow-900/50 text-yellow-400 border-yellow-800'
+                          : order.status === 'Failed'
+                            ? 'bg-red-900/50 text-red-400 border-red-800'
+                            : 'bg-blue-900/50 text-blue-400 border-blue-800'
+                      }`}
                   >
                     {order.status}
                   </span>

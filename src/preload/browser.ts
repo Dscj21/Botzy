@@ -327,23 +327,38 @@ function scrapeDetailDOM() {
   for (const sel of specificSelectors) {
     const el = document.querySelector(sel)
     if (el && (el as HTMLElement).innerText.length > 5) {
-      name = (el as HTMLElement).innerText.trim()
-      // Try to find image near it
-      const row = el.closest('div.a-row') || el.closest('div._1AtVbE') || el.closest('div._2hZU66')
-      if (row) {
-        const img = row.querySelector('img')
-        if (img) imageUrl = img.src
+      const txt = (el as HTMLElement).innerText.trim()
+      // Validation: exclude status messages
+      if (
+        !txt.includes('Item waiting') &&
+        !txt.includes('left a Flipkart') &&
+        !txt.includes('Delivery') &&
+        !txt.includes('picked up') &&
+        !txt.includes('Return')
+      ) {
+         name = txt
       }
-      break
+      
+      // Try to find image near it
+      if (name) {
+        const row = el.closest('div.a-row') || el.closest('div._1AtVbE') || el.closest('div._2hZU66')
+        if (row) {
+            const img = row.querySelector('img')
+            if (img) imageUrl = img.src
+        }
+        break
+      }
     }
   }
 
+  // Priority 2: Product Links (Most Reliable usually)
   if (!name) {
     const candidates = Array.from(document.querySelectorAll('a'))
       .filter(
         (a) => (a.href.includes('/p/') || a.href.includes('/dl/')) && !a.href.includes('review')
       )
       .map((a) => ({ text: a.innerText.trim(), el: a }))
+      .filter(c => c.text.length > 5 && !c.text.includes('Review'))
       .sort((a, b) => b.text.length - a.text.length)
 
     if (candidates.length > 0) {
@@ -403,7 +418,14 @@ function scrapeDetailDOM() {
           !t.includes('hub') &&
           !t.includes('item has been') &&
           !t.includes('courier') &&
-          !t.includes('waiting to be picked')
+          !t.includes('waiting to be picked') &&
+          !t.includes('left a Flipkart') &&
+          !t.includes('facility') && 
+          !t.includes('picked up') &&
+          !t.includes('refund') &&
+          !t.includes('replacement') &&
+          !t.includes('shipment') &&
+          !t.includes('Expected')
       )
       .sort((a, b) => b.length - a.length)
     if (textNodes.length > 0) name = textNodes[0]

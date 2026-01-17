@@ -307,6 +307,27 @@ export const setupIpcHandlers = (mainWindow: BrowserWindow) => {
       data = arg1.data
     }
 
+    // Inject sensitive credentials on Request (Secure Relay)
+    if (data && data._attachCredentials && sessionId !== 'netsafe') {
+      try {
+        const acc = dbManager
+          .getDb()
+          .prepare('SELECT * FROM accounts WHERE id = ?')
+          .get(sessionId) as any
+        if (acc) {
+          // data.username = acc.username // Use existing 'email' or 'username' field based on target
+          if (!data.username) data.username = acc.username
+          if (!data.email) data.email = acc.username
+          if (acc.encrypted_password) {
+            data.password = decrypt(acc.encrypted_password)
+          }
+        }
+        delete data._attachCredentials
+      } catch (e) {
+        console.error('Failed to attach credentials', e)
+      }
+    }
+
     console.log(`[IPC Handlers] Processing '${command}' for Session ${sessionId}`)
 
     const view = sessionManager.getView(sessionId)

@@ -15,7 +15,8 @@ import {
   Calendar,
   Search,
   Eye,
-  X
+  X,
+  EyeOff
 } from 'lucide-react'
 
 interface SavedAccount {
@@ -44,6 +45,7 @@ export function CardsPage() {
   const [bank, setBank] = useState('hdfc')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [cardholderName, setCardholderName] = useState('')
   const [beneficiaryName, setBeneficiaryName] = useState('')
   const [cardPassword, setCardPassword] = useState('')
@@ -115,7 +117,7 @@ export function CardsPage() {
         if (p.confirmMobile) setConfirmMobile(p.confirmMobile)
         if (p.message) setMessage(p.message)
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [])
 
   useEffect(() => {
@@ -369,13 +371,26 @@ export function CardsPage() {
                   </div>
                   <div>
                     <label className={labelClass}>Password</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={inputClass}
-                      placeholder="Password"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showLoginPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`${inputClass} pr-10`}
+                        placeholder="Password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                      >
+                        {showLoginPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
