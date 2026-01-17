@@ -2,6 +2,66 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
 import { RefreshCw, Download, Trash2, Search, CheckSquare, Filter } from 'lucide-react'
 
+/* Inline Edit Component */
+const InlineEdit = ({
+  orderId,
+  field,
+  value,
+  onUpdate
+}: {
+  orderId: string
+  field: string
+  value: string
+  onUpdate: () => void
+}) => {
+  const [editing, setEditing] = useState(false)
+  const [tempValue, setTempValue] = useState(value || '')
+
+  useEffect(() => {
+    setTempValue(value || '')
+  }, [value])
+
+  const handleSave = async () => {
+    if (tempValue !== value) {
+      await (window as any).electron.ipcRenderer.invoke('db:update-order-field', {
+        order_id: orderId,
+        field,
+        value: tempValue
+      })
+      onUpdate()
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        className="w-[200px] bg-slate-700 text-white px-2 py-1 rounded outline-none border border-blue-500 text-sm font-mono"
+        value={tempValue}
+        onChange={(e) => setTempValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSave()
+          if (e.key === 'Escape') {
+            setTempValue(value || '')
+            setEditing(false)
+          }
+        }}
+      />
+    )
+  }
+
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      className={`cursor-pointer min-h-[30px] min-w-[100px] px-2 py-1 rounded hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-600 flex items-center gap-2 ${!value ? 'text-gray-600 italic text-xs' : 'text-emerald-400 font-mono text-sm'}`}
+    >
+      {value || 'Add Card'}
+    </div>
+  )
+}
+
 export function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [search, setSearch] = useState('')
@@ -142,70 +202,6 @@ export function OrdersPage() {
     } catch (e) {
       return iso
     }
-  }
-
-  /* Inline Edit Component */
-  const InlineEdit = ({
-    orderId,
-    field,
-    value,
-    onUpdate
-  }: {
-    orderId: string
-    field: string
-    value: string
-    onUpdate: () => void
-  }) => {
-    const [editing, setEditing] = useState(false)
-    const [tempValue, setTempValue] = useState(value || '')
-
-    useEffect(() => {
-      setTempValue(value || '')
-    }, [value])
-
-    const handleSave = async () => {
-      // Don't save if unchanged
-      //   if (tempValue !== value) { // Logic moved to blur/enter
-      //   }
-      // Actually, we must save on blur or enter
-      if (tempValue !== value) {
-        await (window as any).electron.ipcRenderer.invoke('db:update-order-field', {
-          order_id: orderId,
-          field,
-          value: tempValue
-        })
-        onUpdate()
-      }
-      setEditing(false)
-    }
-
-    if (editing) {
-      return (
-        <input
-          autoFocus
-          className="w-[150px] bg-slate-700 text-white px-2 py-1 rounded outline-none border border-blue-500 text-sm font-mono"
-          value={tempValue}
-          onChange={(e) => setTempValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSave()
-            if (e.key === 'Escape') {
-              setTempValue(value || '')
-              setEditing(false)
-            }
-          }}
-        />
-      )
-    }
-
-    return (
-      <div
-        onClick={() => setEditing(true)}
-        className={`cursor-pointer min-h-[30px] min-w-[100px] px-2 py-1 rounded hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-600 flex items-center gap-2 ${!value ? 'text-gray-600 italic text-xs' : 'text-emerald-400 font-mono text-sm'}`}
-      >
-        {value || 'Add Card'}
-      </div>
-    )
   }
 
   const filteredOrders = orders
