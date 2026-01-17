@@ -44,4 +44,4 @@ publish:
   provider: github
   owner: Dscj21
   repo: Botzy
-  private: true
+

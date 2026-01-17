@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'path'
 import { autoUpdater } from 'electron-updater'
+import log from 'electron-log'
 import icon from '../../resources/icon.png?asset'
 import { dbManager } from './database'
 import { setupIpcHandlers } from './ipcHandlers'
@@ -75,35 +76,42 @@ function createWindow(): void {
 }
 
 function setupAutoUpdater() {
+  autoUpdater.logger = log
+  // @ts-ignore
+  autoUpdater.logger.transports.file.level = 'info'
+  
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
-  console.log('[Updater] Initializing...')
+  log.info('[Updater] Initializing...')
 
   autoUpdater.on('checking-for-update', () => {
-    console.log('[Updater] Checking for update...')
+    log.info('[Updater] Checking for update...')
+    mainWindow?.webContents.send('checking-for-update')
   })
 
   autoUpdater.on('update-available', (info) => {
-    console.log('[Updater] Update available:', info.version)
+    log.info('[Updater] Update available:', info.version)
     mainWindow?.webContents.send('update-available', info)
   })
 
   autoUpdater.on('update-not-available', () => {
-    console.log('[Updater] Update not available')
+    log.info('[Updater] Update not available')
+    mainWindow?.webContents.send('update-not-available')
   })
 
   autoUpdater.on('error', (err) => {
-    console.error('[Updater] Error:', err)
+    log.error('[Updater] Error:', err)
+    mainWindow?.webContents.send('update-error', err.message)
   })
 
   autoUpdater.on('download-progress', (progressObj) => {
-    console.log(`[Updater] Download speed: ${progressObj.bytesPerSecond} - ${progressObj.percent}%`)
+    // log.info(`[Updater] Speed: ${progressObj.bytesPerSecond} - ${progressObj.percent}%`)
     mainWindow?.webContents.send('update-download-progress', progressObj)
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('[Updater] Update downloaded')
+    log.info('[Updater] Update downloaded')
     mainWindow?.webContents.send('update-downloaded', info)
   })
 
